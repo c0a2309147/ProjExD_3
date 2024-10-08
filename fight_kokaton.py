@@ -2,6 +2,7 @@ import os
 import random
 import sys
 import time
+import math
 import pygame as pg
 
 WIDTH = 1100  # ゲームウィンドウの幅
@@ -53,6 +54,7 @@ class Bird:
         self.img = __class__.imgs[(+5, 0)]
         self.rct: pg.Rect = self.img.get_rect()
         self.rct.center = xy
+        self.dire = (+5, 0)  # 向きを初期化
 
     def change_img(self, num: int, screen: pg.Surface):
         """
@@ -78,6 +80,7 @@ class Bird:
         if check_bound(self.rct) != (True, True):
             self.rct.move_ip(-sum_mv[0], -sum_mv[1])
         if not (sum_mv[0] == 0 and sum_mv[1] == 0):
+            self.dire = tuple(sum_mv)  # 向きを更新
             self.img = __class__.imgs[tuple(sum_mv)]
         screen.blit(self.img, self.rct)
 
@@ -93,9 +96,15 @@ class Beam:
         """
         self.img = pg.image.load("fig/beam.png")  # ビームSurface
         self.rct = self.img.get_rect()  # ビームSurfaceのRectを抽出
-        self.rct.centery = bird.rct.centery  # こうかとんの中心縦座標をビームの縦座標
-        self.rct.left = bird.rct.right  # こうかとんの右座標をビームの左座標
-        self.vx, self.vy = +5, 0
+        
+        # 向きに応じた速度を設定
+        self.vx, self.vy = bird.dire
+        # ビームの角度を計算
+        angle = math.degrees(math.atan2(-self.vy, self.vx))
+        self.img = pg.transform.rotozoom(self.img, angle, 1)  # ビームを回転
+        # ビームの初期位置を設定
+        self.rct.centerx = bird.rct.centerx + bird.rct.width / 2
+        self.rct.centery = bird.rct.centery
 
     def update(self, screen: pg.Surface):
         """
@@ -173,14 +182,13 @@ class Explosion:
         イニシャライザ
         引数 center: 爆発の中心座標
         """
-        # explosion.gifとその反転画像をリストに格納
         self.images = [
             pg.image.load("fig/explosion.gif"),
             pg.transform.flip(pg.image.load("fig/explosion.gif"), True, False),
             pg.transform.flip(pg.image.load("fig/explosion.gif"), False, True),
             pg.transform.flip(pg.image.load("fig/explosion.gif"), True, True)
         ]
-        self.rct = self.images[0].get_rect(center=center)  # 爆発の位置
+        self.rct = self.images[0].get_rect(center=center)
         self.life = 30  # 表示時間（爆発時間）
 
     def update(self, screen: pg.Surface):
@@ -188,10 +196,9 @@ class Explosion:
         爆発を更新し、画面に描画する
         """
         if self.life > 0:
-            # 表示する画像を交互に切り替える
             image_index = (30 - self.life) // 10 % len(self.images)
             screen.blit(self.images[image_index], self.rct)
-            self.life -= 1  # 経過時間を減算
+            self.life -= 1
 
 
 def main():
