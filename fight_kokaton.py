@@ -89,7 +89,7 @@ class Beam:
     """
     こうかとんが放つビームに関するクラス
     """
-    def __init__(self, bird:"Bird"):
+    def __init__(self, bird: "Bird"):
         """
         ビーム画像Surfaceを生成する
         引数 bird：ビームを放つこうかとん（Birdインスタンス）
@@ -107,7 +107,7 @@ class Beam:
         """
         if check_bound(self.rct) == (True, True):
             self.rct.move_ip(self.vx, self.vy)
-            screen.blit(self.img, self.rct)    
+            screen.blit(self.img, self.rct)
 
 
 class Bomb:
@@ -120,7 +120,7 @@ class Bomb:
         引数1 color：爆弾円の色タプル
         引数2 rad：爆弾円の半径
         """
-        self.img = pg.Surface((2*rad, 2*rad))
+        self.img = pg.Surface((2 * rad, 2 * rad))
         pg.draw.circle(self.img, color, (rad, rad), rad)
         self.img.set_colorkey((0, 0, 0))
         self.rct = self.img.get_rect()
@@ -141,16 +141,44 @@ class Bomb:
         screen.blit(self.img, self.rct)
 
 
+class Score:
+    """
+    スコア表示に関するクラス
+    """
+    def __init__(self):
+        """
+        スコアの初期化
+        """
+        self.fonto = pg.font.SysFont("hgp創英角ﾎﾟｯﾌﾟ体", 30)
+        self.color = (0, 0, 255)  # 青
+        self.score = 0  # スコアの初期値
+        self.img = self.fonto.render(f"Score: {self.score}", True, self.color)
+
+    def update(self):
+        """
+        現在のスコアを表示する文字列Surfaceの生成
+        """
+        self.img = self.fonto.render(f"Score: {self.score}", True, self.color)
+
+    def draw(self, screen: pg.Surface):
+        """
+        スコアを画面に描画する
+        引数 screen：画面Surface
+        """
+        screen.blit(self.img, (100, HEIGHT - 50))
+
+
 def main():
     pg.display.set_caption("たたかえ！こうかとん")
     screen = pg.display.set_mode((WIDTH, HEIGHT))    
     bg_img = pg.image.load("fig/pg_bg.jpg")
     bird = Bird((300, 200))
     beam = None
-    bomb = Bomb((255, 0, 0), 10)
     bombs = [Bomb((255, 0, 0), 10) for _ in range(NUM_OF_BOMBS)]
+    score = Score()  # スコアインスタンスの生成
     clock = pg.time.Clock()
     tmr = 0
+
     while True:
         for event in pg.event.get():
             if event.type == pg.QUIT:
@@ -158,6 +186,7 @@ def main():
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 # スペースキー押下でBeamクラスのインスタンス生成
                 beam = Beam(bird)           
+        
         screen.blit(bg_img, [0, 0])
         
         for bomb in bombs:
@@ -176,7 +205,10 @@ def main():
                 if beam.rct.colliderect(bomb.rct):  # ビームと爆弾が衝突したら
                     beam, bombs[j] = None, None
                     bird.change_img(6, screen)
-                    pg.display.update()              
+                    score.score += 1  # スコアを1点加算
+                    score.update()  # スコアを更新
+                    pg.display.update()
+        
         bombs = [bomb for bomb in bombs if bomb is not None]
 
         key_lst = pg.key.get_pressed()
@@ -185,6 +217,8 @@ def main():
             beam.update(screen) 
         for bomb in bombs:
             bomb.update(screen)
+
+        score.draw(screen)  # スコアを描画
         pg.display.update()
         tmr += 1
         clock.tick(50)
