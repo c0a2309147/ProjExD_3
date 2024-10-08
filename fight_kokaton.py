@@ -4,18 +4,15 @@ import sys
 import time
 import pygame as pg
 
-
 WIDTH = 1100  # ゲームウィンドウの幅
 HEIGHT = 650  # ゲームウィンドウの高さ
-NUM_OF_BOMBS = 5  # 爆弾の個数 
+NUM_OF_BOMBS = 5  # 爆弾の個数
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 
 def check_bound(obj_rct: pg.Rect) -> tuple[bool, bool]:
     """
     オブジェクトが画面内or画面外を判定し，真理値タプルを返す関数
-    引数：こうかとんや爆弾，ビームなどのRect
-    戻り値：横方向，縦方向のはみ出し判定結果（画面内：True／画面外：False）
     """
     yoko, tate = True, True
     if obj_rct.left < 0 or WIDTH < obj_rct.right:
@@ -167,46 +164,78 @@ class Score:
         screen.blit(self.img, (100, HEIGHT - 50))
 
 
+class Explosion:
+    """
+    爆発エフェクトに関するクラス
+    """
+    def __init__(self, center: tuple[int, int]):
+        """
+        イニシャライザ
+        引数 center: 爆発の中心座標
+        """
+        # explosion.gifとその反転画像をリストに格納
+        self.images = [
+            pg.image.load("fig/explosion.gif"),
+            pg.transform.flip(pg.image.load("fig/explosion.gif"), True, False),
+            pg.transform.flip(pg.image.load("fig/explosion.gif"), False, True),
+            pg.transform.flip(pg.image.load("fig/explosion.gif"), True, True)
+        ]
+        self.rct = self.images[0].get_rect(center=center)  # 爆発の位置
+        self.life = 30  # 表示時間（爆発時間）
+
+    def update(self, screen: pg.Surface):
+        """
+        爆発を更新し、画面に描画する
+        """
+        if self.life > 0:
+            # 表示する画像を交互に切り替える
+            image_index = (30 - self.life) // 10 % len(self.images)
+            screen.blit(self.images[image_index], self.rct)
+            self.life -= 1  # 経過時間を減算
+
+
 def main():
     pg.display.set_caption("たたかえ！こうかとん")
-    screen = pg.display.set_mode((WIDTH, HEIGHT))    
+    screen = pg.display.set_mode((WIDTH, HEIGHT))
     bg_img = pg.image.load("fig/pg_bg.jpg")
     bird = Bird((300, 200))
     beams = []  # ビームインスタンスを管理するリスト
     bombs = [Bomb((255, 0, 0), 10) for _ in range(NUM_OF_BOMBS)]
     score = Score()  # スコアインスタンスの生成
+    explosions = []  # Explosionインスタンスを管理するリスト
     clock = pg.time.Clock()
-    
+
     while True:
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                # スペースキー押下でBeamクラスのインスタンス生成
                 beams.append(Beam(bird))  # リストにビームを追加
-        
+
         screen.blit(bg_img, [0, 0])
-        
+
         for bomb in bombs:
             if bird.rct.colliderect(bomb.rct):
-                # ゲームオーバー時に，こうかとん画像を切り替え，1秒間表示させる
                 bird.change_img(8, screen)
                 fonto = pg.font.Font(None, 80)
                 txt = fonto.render("Game Over", True, (255, 0, 0))
-                screen.blit(txt, [WIDTH//2-150, HEIGHT//2])
+                screen.blit(txt, [WIDTH // 2 - 150, HEIGHT // 2])
                 pg.display.update()
                 time.sleep(1)
                 return
-        
-        # ビームの衝突判定と画面外のビームを削除
-        for beam in beams[:]:  # コピーを使ってリストをループ
-            if beam.rct.colliderect(bomb.rct):
-                beams.remove(beam)  # 衝突したビームを削除
-                bird.change_img(6, screen)
-                score.score += 1  # スコアを1点加算
-                score.update()  # スコアを更新
-        
-        beams = [beam for beam in beams if check_bound(beam.rct) == (True, True)]  # 画面内のビームのみ保持
+
+        # ビームの衝突判定と爆発の生成
+        for beam in beams[:]:
+            for bomb in bombs:
+                if beam.rct.colliderect(bomb.rct):
+                    beams.remove(beam)  # 衝突したビームを削除
+                    bird.change_img(6, screen)
+                    score.score += 1  # スコアを1点加算
+                    score.update()  # スコアを更新
+                    explosions.append(Explosion(bomb.rct.center))  # Explosionインスタンスを生成
+
+        # 画面内のビームのみ保持
+        beams = [beam for beam in beams if check_bound(beam.rct) == (True, True)]
 
         key_lst = pg.key.get_pressed()
         bird.update(key_lst, screen)
@@ -216,6 +245,12 @@ def main():
 
         for bomb in bombs:
             bomb.update(screen)
+
+        # 爆発エフェクトを更新・描画
+        for explosion in explosions[:]:
+            explosion.update(screen)
+            if explosion.life <= 0:  # lifeが0以下のExplosionを削除
+                explosions.remove(explosion)
 
         score.draw(screen)  # スコアを描画
         pg.display.update()
